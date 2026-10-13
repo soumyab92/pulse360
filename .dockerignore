@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+screenshots/
+scratch/
+test_*.js
+test_*.mjs
+debug_*.mjs
+capture_*.mjs
