@@ -1,6 +1,5 @@
 {
-  "buildCommand": null,
-  "outputDirectory": ".",
+  "outputDirectory": "public",
   "cleanUrls": true,
   "rewrites": [
     { "source": "/health", "destination": "/api/health" }

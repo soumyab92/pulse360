@@ -1,0 +1,24 @@
+{
+  "name": "PULSE360 — Next-Gen Internet Analysis",
+  "short_name": "PULSE360",
+  "description": "Real-time 360-degree internet connection diagnostics. Download, upload, latency, jitter, bufferbloat grading, and grounded AI assistant.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08090d",
+  "theme_color": "#08090d",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
