@@ -32,3 +32,4 @@ copyRecursive(path.join(__dirname, 'src'), path.join(publicDir, 'src'));
 copyRecursive(path.join(__dirname, 'assets'), path.join(publicDir, 'assets'));
 
 console.log('PULSE360 build complete: static assets prepared in public/');
+
