@@ -60,6 +60,18 @@ docker run -p 3000:3000 pulse360
 
 ---
 
+## ▲ Deploying to Vercel
+
+PULSE360 is optimized for zero-config deployment on [Vercel](https://vercel.com/):
+
+1. Go to **[vercel.com/new](https://vercel.com/new)**.
+2. Select your imported GitHub repository: **`soumyab92/pulse360`**.
+3. Leave all default build settings as detected (Framework: **Other**, Root Directory: `./`).
+4. Click **Deploy**.
+5. Your PULSE360 instance is immediately live worldwide with global Edge CDN caching and serverless API execution!
+
+---
+
 ## 📡 API Endpoints
 
 - `GET /health` or `GET /api/health`: Health check and uptime probe.

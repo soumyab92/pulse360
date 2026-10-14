@@ -247,4 +247,17 @@ _Add confirmed decisions here as the project progresses (final colors, spacing s
 - **Open Graph & Social Share**:
   - Fully configured Open Graph (`og:title`, `og:description`, `og:image`, `og:type`) and Twitter Summary Large Card metadata.
 - **Production Containerization**:
-  - Dockerfile targeting `node:22-alpine` with minimal image footprint (<180MB) and non-privileged execution model.
+  - Dockerfile targeting `node:22-alpine` with minimal image footprint (<180MB) and non-privileged execution model.
+
+## 10. Vercel Serverless Deployment Architecture
+- **Global Edge CDN & Serverless Function Decoupling**:
+  - Root frontend assets (`index.html`, `manifest.json`, `assets/*`, `src/*`) are hosted and distributed on Vercel's Edge CDN.
+  - API routes (`/api/pulse-llm`, `/api/knowledge`, `/api/health`, `/health`) execute as lightweight Vercel Serverless Functions powered by Node.js.
+- **Dual-Mode Request Dispatcher (`server.js`)**:
+  - Pure zero-dependency handler `handleRequest(req, res)` serves both local standalone execution (`node server.js`) and serverless execution (`process.env.VERCEL`).
+  - Dual stream & pre-parsed body parser `parseRequestBody(req)` transparently accommodates both Node readable streams and Vercel's pre-parsed JSON payloads.
+  - Knowledge Base files (`knowledge/*.md`) are bundled directly into serverless functions using `vercel.json` `includeFiles: "knowledge/**"` and resolved via `path.join(__dirname, 'knowledge')` and `process.cwd()`.
+- **Zero-Config Vercel Configuration (`vercel.json`)**:
+  - `"framework": null` prevents misclassification as Vite/React.
+  - Clean URL rewriting: maps `/health` & `/api/health` to `api/health.js`, `/api/knowledge` to `api/knowledge.js`, and `/api/pulse-llm` to `api/pulse-llm.js`.
+  - Max function timeout configured to 30 seconds for complete SSE typewriter streaming.

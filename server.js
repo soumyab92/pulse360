@@ -76,7 +76,10 @@ function isRateLimited(ip) {
 
 // Knowledge Base Chunking Utility
 function getKnowledgeChunks() {
-  const knowledgeDir = path.join(__dirname, 'knowledge');
+  let knowledgeDir = path.join(__dirname, 'knowledge');
+  if (!fs.existsSync(knowledgeDir)) {
+    knowledgeDir = path.join(process.cwd(), 'knowledge');
+  }
   if (!fs.existsSync(knowledgeDir)) {
     return [];
   }
@@ -606,7 +609,40 @@ function generateGroundedResponse(prompt, context) {
   };
 }
 
-const server = http.createServer((req, res) => {
+// Request Body Parser (Supports both pre-parsed req.body from Vercel and raw stream from Node http)
+function parseRequestBody(req) {
+  if (req.body !== undefined && req.body !== null) {
+    if (typeof req.body === 'object') return Promise.resolve(req.body);
+    if (typeof req.body === 'string') {
+      try {
+        return Promise.resolve(JSON.parse(req.body));
+      } catch {
+        return Promise.resolve({});
+      }
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 50000) {
+        req.destroy();
+        reject(new Error('PAYLOAD_TOO_LARGE'));
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', err => reject(err));
+  });
+}
+
+async function handleRequest(req, res) {
   // Security headers & CORS
   setSecurityHeaders(res);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -619,8 +655,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-  const urlParts = req.url.split('?');
+  const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+  const rawUrl = req.headers['x-matched-path'] || req.url || '/';
+  const urlParts = rawUrl.split('?');
   const reqPath = decodeURI(urlParts[0]);
 
   // 1. Health check routes: /health and /api/health
@@ -639,7 +676,7 @@ const server = http.createServer((req, res) => {
   }
 
   // 2. API Route: GET /api/knowledge
-  if (req.method === 'GET' && reqPath === '/api/knowledge') {
+  if (req.method === 'GET' && (reqPath === '/api/knowledge' || reqPath === '/knowledge')) {
     const chunks = getKnowledgeChunks();
     res.writeHead(200, {
       'Content-Type': 'application/json; charset=UTF-8',
@@ -650,7 +687,7 @@ const server = http.createServer((req, res) => {
   }
 
   // 3. API Route: POST /api/pulse-llm
-  if (req.method === 'POST' && reqPath === '/api/pulse-llm') {
+  if (req.method === 'POST' && (reqPath === '/api/pulse-llm' || reqPath === '/pulse-llm')) {
     // Rate limit check (20 req/min)
     if (isRateLimited(clientIp)) {
       res.writeHead(429, { 'Content-Type': 'application/json; charset=UTF-8' });
@@ -658,80 +695,60 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk;
-      // Safeguard max payload size
-      if (body.length > 50000) {
-        res.writeHead(413, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Payload too large.' }));
-        req.destroy();
+    try {
+      const payload = await parseRequestBody(req);
+      const prompt = (payload.prompt || '').trim();
+      const context = payload.context || {};
+
+      // Length limit validation (max 1000 chars)
+      if (prompt.length > 1000) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ error: 'Prompt exceeds maximum limit of 1,000 characters.' }));
+        return;
       }
-    });
 
-    req.on('end', async () => {
-      try {
-        const payload = JSON.parse(body || '{}');
-        const prompt = (payload.prompt || '').trim();
-        const context = payload.context || {};
+      if (!prompt) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ error: 'Prompt is required.' }));
+        return;
+      }
 
-        // Length limit validation (max 1000 chars)
-        if (prompt.length > 1000) {
-          res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
-          res.end(JSON.stringify({ error: 'Prompt exceeds maximum limit of 1,000 characters.' }));
-          return;
-        }
+      // Set up streaming response (SSE / chunked)
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=UTF-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive'
+      });
 
-        if (!prompt) {
-          res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
-          res.end(JSON.stringify({ error: 'Prompt is required.' }));
-          return;
-        }
+      // Internal Grounded RAG Reasoning Engine (Strictly adheres to AGENT_RULES)
+      const result = generateGroundedResponse(prompt, context);
+      const fullText = result.text;
+      const sourcesUsed = result.sourcesUsed || [];
+      const optionsProvided = result.options || [];
 
-        // Set up streaming response (SSE / chunked)
-        res.writeHead(200, {
-          'Content-Type': 'text/event-stream; charset=UTF-8',
-          'Cache-Control': 'no-cache, no-transform',
-          'Connection': 'keep-alive'
-        });
+      // Stream typewriter chunks to client
+      const chunkSize = 25;
+      for (let i = 0; i < fullText.length; i += chunkSize) {
+        const chunk = fullText.substring(i, i + chunkSize);
+        res.write(`data: ${JSON.stringify({ chunk, done: false })}\n\n`);
+        await new Promise(r => setTimeout(r, 18));
+      }
 
-        // Check if an external LLM API key is present in environment
-        const apiKey = process.env.LLM_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
-
-        let fullText = '';
-        let sourcesUsed = [];
-        let optionsProvided = [];
-
-        if (apiKey && process.env.USE_EXTERNAL_LLM === 'true') {
-          // If external provider is enabled and key exists, call Gemini or OpenAI API
-          // (Defaults to internal high-precision grounded engine for deterministic reliability)
+      // Send sources and completion with interactive options
+      res.write(`data: ${JSON.stringify({ chunk: '', done: true, sources: sourcesUsed, options: optionsProvided })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error('LLM Route error:', err);
+      if (!res.headersSent) {
+        if (err.message === 'PAYLOAD_TOO_LARGE') {
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Payload too large.' }));
         } else {
-          // Internal Grounded RAG Reasoning Engine (Strictly adheres to AGENT_RULES)
-          const result = generateGroundedResponse(prompt, context);
-          fullText = result.text;
-          sourcesUsed = result.sourcesUsed || [];
-          optionsProvided = result.options || [];
-        }
-
-        // Stream typewriter chunks to client
-        const chunkSize = 25;
-        for (let i = 0; i < fullText.length; i += chunkSize) {
-          const chunk = fullText.substring(i, i + chunkSize);
-          res.write(`data: ${JSON.stringify({ chunk, done: false })}\n\n`);
-          await new Promise(r => setTimeout(r, 18));
-        }
-
-        // Send sources and completion with interactive options
-        res.write(`data: ${JSON.stringify({ chunk: '', done: true, sources: sourcesUsed, options: optionsProvided })}\n\n`);
-        res.end();
-      } catch (err) {
-        console.error('LLM Route error:', err);
-        if (!res.headersSent) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Internal server error processing query.' }));
         }
       }
-    });
+    }
     return;
   }
 
@@ -760,6 +777,16 @@ const server = http.createServer((req, res) => {
 
     const ext = path.extname(filePath).toLowerCase();
     serveStaticFile(req, res, filePath, stats, ext);
+  });
+}
+
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch(err => {
+    console.error('Unhandled request error:', err);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error.' }));
+    }
   });
 });
 
@@ -806,10 +833,15 @@ const shutdown = (signal) => {
   }, 5000);
 };
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+if (!process.env.VERCEL) {
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`PULSE360 HTTP Server running at http://localhost:${PORT}/ (Port: ${PORT})`);
-  console.log(`Knowledge Base loaded: ${getKnowledgeChunks().length} chunks indexed.`);
-});
+  server.listen(PORT, () => {
+    console.log(`PULSE360 HTTP Server running at http://localhost:${PORT}/ (Port: ${PORT})`);
+    console.log(`Knowledge Base loaded: ${getKnowledgeChunks().length} chunks indexed.`);
+  });
+}
+
+export { server, handleRequest, getKnowledgeChunks, generateGroundedResponse };
+export default server;
