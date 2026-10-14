@@ -1,6 +1,8 @@
 # PULSE360 — 360° Network Architecture Diagnostic & Grounded AI Operator
 
 > **PULSE360** analyzes internet connectivity from every angle: download/upload throughput, idle latency & jitter, bufferbloat grading under saturation, DNS resolver benchmarks, 60s stability variance, and real-life workload verdicts. Includes **Ask PULSE**, a grounded AI diagnostic operator with typo tolerance and interactive action dispatching.
+>
+> *Built and engineered using **Antigravity** (Google DeepMind's agentic AI coding assistant).*
 
 ![PULSE360 Interface](screenshots/pulse360_desktop_1440.png)
 

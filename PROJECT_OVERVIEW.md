@@ -1,5 +1,7 @@
 # PULSE360 — Project Overview
 
+> **Built & engineered collaboratively using Antigravity** — Google DeepMind's advanced agentic AI coding assistant.
+
 A high-performance, real-time 360° internet diagnostic platform and grounded AI network operator.
 
 ---
@@ -45,3 +47,14 @@ A high-performance, real-time 360° internet diagnostic platform and grounded AI
    - **Typo Tolerance**: Fuzzy matches misspelled queries using Damerau-Levenshtein distance (e.g. `donwload`, `pnig`, `buffrblot`).
    - **Laser-Focused Answers**: Gives direct, concise answers first with interactive follow-up chips and zero clutter.
 8. **Exportable Network Report**: One-click PNG canvas export of your Network DNA report card for sharing or ISP dispute documentation.
+
+---
+
+## 🤖 Built with Antigravity
+
+This entire application was architected, coded, debugged, and made production-ready using **Antigravity** (Google DeepMind's agentic AI pair programming system):
+- **Autonomous End-to-End Implementation**: From real-time Cloudflare Anycast streaming measurements and WebGL rendering to the client-side vector database and Ask PULSE RAG pipeline.
+- **Production-Grade Architecture**: Zero-dependency native Node.js runtime, POSIX signals, RFC 3550 telemetry standards, and serverless edge deployment on Vercel.
+- **Continuous Quality Control**: Iteratively refined, tested, and optimized with live browser audits and screenshot verification.
+
+
