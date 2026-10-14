@@ -1,13 +1,7 @@
 {
-  "version": 2,
   "cleanUrls": true,
-  "framework": null,
   "rewrites": [
-    { "source": "/health", "destination": "/api/health" },
-    { "source": "/api/health", "destination": "/api/health" },
-    { "source": "/api/knowledge", "destination": "/api/knowledge" },
-    { "source": "/api/pulse-llm", "destination": "/api/pulse-llm" },
-    { "source": "/api/(.*)", "destination": "/api/index.js" }
+    { "source": "/health", "destination": "/api/health" }
   ],
   "functions": {
     "api/**/*.js": {
@@ -16,4 +10,3 @@
     }
   }
 }
-
